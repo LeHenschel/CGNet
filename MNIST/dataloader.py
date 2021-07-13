@@ -21,7 +21,7 @@ class MNISTData(Dataset):
     def __init__(self, mode=TRAIN,
                  lmax=10, rotate=False, dilate=False, a=1.0,
                  to_tensor=True, seed=_settings.RANDOM_SEED,
-                 raw=False, download=False):
+                 raw=False, data_dir=_settings.MNIST_PATH):
         super(MNISTData, self).__init__()
         self.mode = mode
         self._seed = seed
@@ -30,8 +30,8 @@ class MNISTData(Dataset):
         split = TEST if mode == TEST else TRAIN
         kwargs = {'a': 0.2, 'amax': 1.2} if dilate else {'a': a}
         self.coefs = MNIST.MNIST_data_process.precomputing_coefs_new(lmax=lmax, rotate=rotate, split=split,
-                                                                     data_download=download, **kwargs)
-        self.labels = MNIST.MNIST_data_process.get_labels(split=split)
+                                                                     data_dir=data_dir, **kwargs)
+        self.labels = MNIST.MNIST_data_process.get_labels(split=split, data_dir=data_dir)
         if mode == TEST:
             self.indices = np.arange(len(self.labels))
         else:
