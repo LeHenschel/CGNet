@@ -1,4 +1,5 @@
 from importlib import reload
+from keras.datasets import mnist
 import numpy as np
 import os
 import utils.geometries as geometries; reload(geometries)
@@ -134,11 +135,7 @@ def __find_old_coefs(lmax, fdir):
 
 
 def precomputing_coefs_new(lmax, split='test', rotate=False, data_dir=_settings.MNIST_PATH, recompute=False,
-                           data_download=False, rot_func=False, a=1.0, amax=None):
-
-    # Download and extract data
-    if data_download:
-        data_dir, filenames = download(data_dir)
+                           rot_func=False, a=1.0, amax=None):
 
     # Define directories with training/testing data
     coefs_folder = os.path.join(data_dir, 'coefs')
@@ -162,8 +159,10 @@ def precomputing_coefs_new(lmax, split='test', rotate=False, data_dir=_settings.
             return np.load(old_fpath)[:, :lmax**2]
 
     # or recalculate coefficients
-    data_file_name = os.path.join(data_dir, filenames[{'train': 0, 'test': 2}[split]])
-    data = extract_data(data_file_name, 60000 if split == 'train' else 10000)
+    # Download and extract data
+    # Get MNIST
+    (train_X, train_y), (test_X, test_y) = mnist.load_data()
+    data = train_X.astype(np.float32)/(PIXEL_DEPTH + 0.1) if split == "train" else test_X.astype(np.float32)/(PIXEL_DEPTH + 0.1)
     coefs = get_inputs_from2D(lmax, data, random_rotate=rotate, rot_func=rot_func, a=a, amax=amax)
 
     # save to file
@@ -171,14 +170,13 @@ def precomputing_coefs_new(lmax, split='test', rotate=False, data_dir=_settings.
     return coefs, data
 
 
-def get_labels(split='test', data_dir=None):
-    data_dir, filenames = download(data_dir)
-    data_file_name = os.path.join(data_dir, filenames[{'train': 1, 'test': 3}[split]])
+def get_labels(split='test', data_dir=_settings.MNIST_PATH):
     cache_file_path = os.path.join(data_dir, "label_%s.npy" % split)
     if os.path.isfile(cache_file_path):
         labels = np.load(cache_file_path)
     else:
-        labels = extract_labels(data_file_name, 60000 if split == 'train' else 10000)
+        (train_X, train_y), (test_X, test_y) = mnist.load_data()
+        labels = train_y.astype(np.int64) if split == "train" else test_y.astype(np.int64)
         np_save_safe(cache_file_path, labels)
     return labels
 
