@@ -1,6 +1,6 @@
 import os
 import sys
-DATA_PATH = "Z:/Data" #Local
+DATA_PATH = "Data" #Local
 
 __CUR_FILE_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(os.path.abspath(__CUR_FILE_PATH)))
