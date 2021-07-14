@@ -67,7 +67,8 @@ class CG_sparse_py(nn.Module):
                  tau_pre,
                  ltuples = None,
                  precomputed_CG=None,
-                 cudaFlag=False):
+                 cudaFlag=False,
+                 weight_type="cost"):
 
         # Take it as a list of batch tensor (4D)
         super(CG_sparse_py, self).__init__()
@@ -80,7 +81,7 @@ class CG_sparse_py(nn.Module):
         elif ltuples == 'mst':
             ltuples = []
             for l in range(self.lmax+1):
-                l1s, l2s = CGutils.compute_MST(l, self.lmax, diag=True)
+                l1s, l2s = CGutils.compute_MST(l, self.lmax, diag=True, weight_type=weight_type)
                 ltuples.append([(l1,l2) for l1,l2 in zip(l1s, l2s)])
         elif ltuples == 'debug':
             ltuples = CGutils.SparseLtuples.compute_debug_ltuples(self.lmax)
@@ -190,7 +191,8 @@ class CGBN_base(nn.Module):
                  cudaFlag=True,
                  batchnorm=True,
                  sparse_flag=False,
-                 weight_scale=0.05, init='random'):
+                 weight_scale=0.05, init='random',
+                 weight_type="cost"):
         """
 
         Input: Take a list of batch tensor (4D), where input[l] = (B, tau_fs[l], 2l+1, 2) shape
@@ -214,7 +216,7 @@ class CGBN_base(nn.Module):
 
         #init the CG transform
         if sparse_flag:
-            self.cg = CG_sparse_py(lmax, taus_fs, ltuples='mst')  # python version of sparse
+            self.cg = CG_sparse_py(lmax, taus_fs, ltuples='mst', weight_type=weight_type)  # python version of sparse
         else:
             self.cg = CG_sparse_py(lmax, taus_fs, ltuples=None)  # python version of sparse
 

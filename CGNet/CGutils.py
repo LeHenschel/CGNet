@@ -70,7 +70,7 @@ class ClebschGordanDict():
         return CGmat[m + l, (m1 + l1) * (2 * l2 + 1) + (m2 + l2)]
 
 
-def compute_MST(l, lmax, diag=False):
+def compute_MST(l, lmax, diag=False, weight_type="cost"):
     from scipy.sparse import csr_matrix
     from scipy.sparse.csgraph import minimum_spanning_tree
     l1s = []  # row
@@ -81,7 +81,18 @@ def compute_MST(l, lmax, diag=False):
             if abs(l1 - l2) <= l and l <= l1 + l2:
                 l1s.append(l1)
                 l2s.append(l2)
-                data.append((2 * l + 1) * (2 * l1 + 1) * (2 * l2 + 1))
+                # cost weighting --> based on total number of fragments (default)
+                # changeable to binary adjacency matrix for unweighted; sum of ls instead or random
+                if weight_type == "cost":
+                    weight = (2 * l + 1) * (2 * l1 + 1) * (2 * l2 + 1)
+                elif weight_type == "sum":
+                    weight = l + l1 + l2
+                elif weight_type == "random":
+                    # random integer in closed interval [1.0, 10]
+                    weight = np.random.random_integers(1, 10)
+                else:
+                    weight = 1
+                data.append(weight)
     #edges = csr_matrix((data, (l1s, l2s)), shape=(lmax + 1, lmax + 1))
     edges = csr_matrix((data, (l2s, l1s)), shape=(lmax + 1, lmax + 1))
 

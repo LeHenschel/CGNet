@@ -16,7 +16,8 @@ class SphericalCNN(nn.Module):
                  cuda=True,
                  norm=True,
                  skipconn=True,
-                 sparse_flag=False):
+                 sparse_flag=False,
+                 weight_type="cost"):
         """
 
         :param lmax:
@@ -36,7 +37,7 @@ class SphericalCNN(nn.Module):
         # the rest of the layers are like in CGnet (all in cuda)
         self.n_layers = len(taus) - 1
         self.cgs = nn.ModuleList([cglayers.CGBN_cuda(lmax, taus[layer_i], taus[layer_i + 1],
-                                                     batchnorm=norm, sparse_flag=sparse_flag)
+                                                     batchnorm=norm, sparse_flag=sparse_flag, weight_type=weight_type)
                                   for layer_i in range(self.n_layers)])
 
         # for the skip connection..

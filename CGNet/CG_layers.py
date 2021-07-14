@@ -140,24 +140,24 @@ def _precomputeCG_cuda(lmax, llls, device='cuda'):
     CG_cuda_ops.sparse_precomputeCG(CG_coefs, lmax, llls, CG_offsets)
     return CG_coefs, CG_offsets
 
-def _precomputeCG_MST(lmax, method='mst'):
+def _precomputeCG_MST(lmax, method='mst', weight_type="cost"):
     assert method == 'mst', '%s is not implemented'%method
     mst_ltuples = []
     for l in range(lmax + 1):
-        l1s, l2s = CGutils.compute_MST(l, lmax, diag=True)
+        l1s, l2s = CGutils.compute_MST(l, lmax, diag=True, weight_type=weight_type)
         mst_ltuples.append([(l1, l2) for l1, l2 in zip(l1s, l2s)])
     mst_llls = CGutils.SparseLtuples.sparse_rep_ltuples_sorted(mst_ltuples)[0]
     CG_coefs, CG_offsets = _precomputeCG_cuda(lmax, mst_llls)
     return CG_coefs, CG_offsets
 
 @functools.lru_cache(10)
-def precomputeCG(lmax, method='mst', device='cuda'):
+def precomputeCG(lmax, method='mst', device='cuda', weight_type="cost"):
     if method is None:
         ltuples = CGutils.SparseLtuples.compute_default_ltuples(lmax)
         llls = CGutils.SparseLtuples.sparse_rep_ltuples_sorted(ltuples)[0]
         CG_coefs, CG_offsets = _precomputeCG_cuda(lmax, llls)
     elif method == 'mst':
-        CG_coefs, CG_offsets = _precomputeCG_MST(lmax, 'mst')
+        CG_coefs, CG_offsets = _precomputeCG_MST(lmax, 'mst', weight_type=weight_type)
     else:
         raise NotImplementedError()
     if CG_coefs.device != device: CG_coefs = CG_coefs.to(device)
@@ -203,7 +203,7 @@ class _CG_sparse_cuda(torch.autograd.Function):
         return grad_input, None, None, None, None, None, None, None, None, None, None
 
 class CG_woFilter_cuda(nn.Module):
-    def __init__(self, lmax, taus, lll_mode=None, device='cuda'):
+    def __init__(self, lmax, taus, lll_mode=None, device='cuda', weight_type='cost'):
         """
         :param lmax: l=0,...,lmax
         :param taus: taus of the input. The l-fragment in the input is of shape (2l+1, taus[l]) (ingoring the complex dim)
@@ -212,6 +212,8 @@ class CG_woFilter_cuda(nn.Module):
             None: default described in CGNet paper, or
             a list, where lll_mode[l] is a list of (l1,l2) tuples for l
         :param device: only supports 'cuda' only right now
+        :param str weight_type: operation with which edge weights for MST are calculated
+                               (cost = default, sum, random, none)
         """
         super(CG_woFilter_cuda, self).__init__()
         self.lmax = lmax
@@ -224,10 +226,10 @@ class CG_woFilter_cuda(nn.Module):
             self.CGspace, self.CG_offsets = precomputeCG(lmax, lll_mode)
             ltuples = CGutils.SparseLtuples.compute_default_ltuples(lmax)
         elif lll_mode == 'mst':
-            self.CGspace, self.CG_offsets = precomputeCG(lmax, lll_mode)
+            self.CGspace, self.CG_offsets = precomputeCG(lmax, lll_mode, weight_type=weight_type)
             ltuples = []
             for l in range(self.lmax + 1):
-                l1s, l2s = CGutils.compute_MST(l, self.lmax, diag=True)
+                l1s, l2s = CGutils.compute_MST(l, self.lmax, diag=True, weight_type=weight_type)
                 ltuples.append([(l1, l2) for l1, l2 in zip(l1s, l2s)])
         elif lll_mode == 'debug':
             ltuples = CGutils.SparseLtuples.compute_debug_ltuples(self.lmax)
@@ -292,7 +294,7 @@ class CGBN_cuda(nn.Module):
                  sparse_flag=False,
                  device='cuda',
                  weight_scale=0.05, init='random',
-                 eps=1e-5):
+                 eps=1e-5, weight_type="cost"):
         super(CGBN_cuda, self).__init__()
         self.lmax = lmax
 
@@ -300,7 +302,7 @@ class CGBN_cuda(nn.Module):
 
         #init the CG transform
         self.sparse_flag = sparse_flag
-        self.cg = CG_woFilter_cuda(lmax, taus_fs, lll_mode='mst' if sparse_flag else None)
+        self.cg = CG_woFilter_cuda(lmax, taus_fs, lll_mode='mst' if sparse_flag else None, weight_type=weight_type)
 
         #init the batch norm and weight multiplication layer
         self.t_F = self.cg.t_F
