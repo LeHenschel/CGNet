@@ -1,6 +1,6 @@
 #!/bin/bash
 
-declare -a mst_weight_type=(default random sum)
+declare -a mst_weight_type=(cost random sum none)
 num_iterations=5
 
 path=$(pwd)
