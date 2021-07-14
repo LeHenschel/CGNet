@@ -46,8 +46,10 @@ def argument_parse():
                         help='normalization strategy: \n' + \
                              '0: no normlization \n' + \
                              '1: batch-normalization in each layer by scaling each fragment down by a moving average of standard deviation\n')
-    parser.add_argument('--resume', default=None,
-                        help='path to latest checkpoint')
+    parser.add_argument('--ckpt_dir', type=str, default=None,
+                        help="Directory to store checkpoints. Will be automatically determined if not set based on selected options")
+    parser.add_argument('--resume', action="store_true", default=False,
+                        help='Flag, if training should be resumed for the given checkpoint.')
 
     # Optimization Options
     parser.add_argument('--batch-size', type=int, default=100,
@@ -73,8 +75,13 @@ def argument_parse():
     parser.add_argument('--nfc', type=int, default=1, help='number of fully connected layers')
     parser.add_argument('--data_dir', type=str, default=_settings.MNIST_PATH,
                         help="Directory with training/testing files.")
-    parser.adD_argument('--csv_file', type=str, default=None, help="Path where to save run information to csv")
-
+    parser.add_argument('--csv_file', type=str, default=None, help="Path where to save run information to csv")
+    parser.add_argument('--mst_weight', type=str, default="cost", choices=["cost", "random", "none", "sum"],
+                        help="Define way to compute edge weights for MST. "
+                             "Options: cost = computational costs, sum = sum of ls (l+l1+l2), "
+                             "         random = random weights (randomly sampled in interval [1, 10],"
+                             "         none = unweighted (same weight of 1 for all edges)")
+    parser.add_argument('--mst', action="store_true", default=False, help="Reduce CG fragments via MST. Default: False")
     sel_option = parser.parse_args()
     return sel_option
 
@@ -157,7 +164,8 @@ def main(args, save_period=4000):
     # assert args.skip == 1 and args.norm == 1
     model = MNIST_model.MNIST_Net(args.lmax - 1, args.tau_type, args.tau_man,
                                   args.nlayers, skipconn=True, norm=True, cuda=True,
-                                  dropout=args.dropout, nfc=args.nfc)
+                                  dropout=args.dropout, nfc=args.nfc, sparse=args.mst,
+                                  weight_type=args.mst_weight)
     MNIST_model.show_num_parameters(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)  # added weigth decay
@@ -166,8 +174,8 @@ def main(args, save_period=4000):
     args.start_epoch = 0
     args.st = 0
     if args.resume:
-        checkpoint_dir = args.resume
-        last_net_file = os.path.join(checkpoint_dir, 'last_check_point.pth')
+        logger.info("Resume Training run {}".format(args.ckpt_dir))
+        last_net_file = os.path.join(args.ckpt_dir, 'last_check_point.pth')
         if os.path.isfile(last_net_file):
             logger.info("=> loading last model '{}'".format(last_net_file))
             checkpoint = torch.load(last_net_file)
@@ -205,7 +213,7 @@ def main(args, save_period=4000):
                 logging.info("Saving at {}: best_err={}".format(datetime.datetime.now(), best_err))
                 last_save_pt = ed
                 save_net({'epoch': epoch, 'state_dict': model.state_dict(), 'best_err': min(cur_err, best_err),
-                          'optimizer': optimizer.state_dict(), 'st': last_save_pt}, False, args.resume)
+                          'optimizer': optimizer.state_dict(), 'st': last_save_pt}, False, args.ckpt_dir)
         # eval on validation set and save
         model.eval()
         results = eval_data_in_batch_new(model, valid_loader, criterion, logger_name="log_valid")
@@ -213,7 +221,7 @@ def main(args, save_period=4000):
         cur_err = valid_history[1][-1]
         print("Curr Err = %f" % cur_err)
         save_net({'epoch': epoch + 1, 'state_dict': model.state_dict(), 'best_err': min(cur_err, best_err),
-                  'optimizer': optimizer.state_dict(), 'st': 0}, cur_err < best_err, args.resume)
+                  'optimizer': optimizer.state_dict(), 'st': 0}, cur_err < best_err, args.ckpt_dir)
         if cur_err < best_err:
             best_err = cur_err
         elif cur_err > best_err * 2:
@@ -227,9 +235,10 @@ def main(args, save_period=4000):
     end_time = datetime.datetime.now()
     csv_save_dict["train_time"] = (end_time - start_time).microseconds
     csv_save_dict["best_error"] = best_err
+
     if args.resume:
-        checkpoint_dir = args.resume
-        best_net_file = os.path.join(checkpoint_dir, 'net_best.pth')
+        logger.info("Resume Testing run {}".format(args.ckpt_dir))
+        best_net_file = os.path.join(args.ckpt_dir, 'net_best.pth')
         if os.path.isfile(best_net_file):
             logger.info("=> loading best model '{}'".format(best_net_file))
             checkpoint = torch.load(best_net_file)
@@ -267,11 +276,11 @@ if __name__ == "__main__":
     args.dropout = None if args.dropout == "None" else float(args.dropout)
 
     if args.skip == 2:
-        train_name = "ResNet_epoch{}_lr{}_wd{}_layerstep{}_tau{}-{}_lmax{}_batchsize{}_norm{}_nfc{}".format(
+        train_name = "ResNet_epoch{}_lr{}_wd{}_layerstep{}_tau{}-{}_lmax{}_batchsize{}_norm{}_nfc{}_{}_edgeW{}".format(
             args.num_epoch, args.lr, args.weight_decay, args.nlayers, args.tau_type, args.tau_man, args.lmax,
-            args.batch_size, args.norm, args.nfc)
+            args.batch_size, args.norm, args.nfc, "MST" if args.mst else "Full", args.mst_weight)
     else:
-        train_name = "epoch{}_lr{}_wd{}_layer{}_tau{}-{}_lmax{}_batchsize{}_norm{}_nfc{}".format(args.num_epoch,
+        train_name = "epoch{}_lr{}_wd{}_layer{}_tau{}-{}_lmax{}_batchsize{}_norm{}_nfc{}_{}_edgeW{}".format(args.num_epoch,
                                                                                                  args.lr,
                                                                                                  args.weight_decay,
                                                                                                  args.nlayers,
@@ -279,7 +288,9 @@ if __name__ == "__main__":
                                                                                                  args.tau_man,
                                                                                                  args.lmax,
                                                                                                  args.batch_size,
-                                                                                                 args.norm, args.nfc)
+                                                                                                 args.norm, args.nfc,
+                                                                                                 "MST" if args.mst else "Full",
+                                                                                                 args.mst_weight)
         train_name += "" if args.skip == 0 else "_connect-to-output"
     train_name += "_new"
     # train_name += "_relu" if args.relu else ""
@@ -294,13 +305,12 @@ if __name__ == "__main__":
 
     if args.logPath is None:
         args.logPath = CUR_DIR + "/temp_fast/logs/{}.log".format(train_name)
-    if args.resume is None:
-        args.resume = CUR_DIR + "/temp_fast/checkpoint/{}/".format(train_name)
+    if args.ckpt_dir is None:
+        args.ckpt_dir = CUR_DIR + "/temp_fast/checkpoint/{}/".format(train_name)
     log_dir = os.path.dirname(args.logPath)
     if not os.path.isdir(log_dir):
         os.makedirs(log_dir)
-    ckpt_dir = os.path.dirname(args.resume)
-    if not os.path.isdir(ckpt_dir):
-        os.makedirs(ckpt_dir)
+    if not os.path.isdir(args.ckpt_dir):
+        os.makedirs(args.ckpt_dir)
 
     main(args, save_period=20000)
