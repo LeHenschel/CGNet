@@ -16,6 +16,7 @@ import tqdm
 import functools
 import _settings
 import ipdb
+import csv
 
 print("Cuda available?", torch.cuda.is_available())
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -72,6 +73,7 @@ def argument_parse():
     parser.add_argument('--nfc', type=int, default=1, help='number of fully connected layers')
     parser.add_argument('--data_dir', type=str, default=_settings.MNIST_PATH,
                         help="Directory with training/testing files.")
+    parser.adD_argument('--csv_file', type=str, default=None, help="Path where to save run information to csv")
 
     sel_option = parser.parse_args()
     return sel_option
@@ -151,7 +153,7 @@ def main(args, save_period=4000):
     valid_loader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
     logger = logging.getLogger("log_main")
-
+    csv_save_dict = {"mst": args.mst, "mst_weight": args.mst_weight}
     # assert args.skip == 1 and args.norm == 1
     model = MNIST_model.MNIST_Net(args.lmax - 1, args.tau_type, args.tau_man,
                                   args.nlayers, skipconn=True, norm=True, cuda=True,
@@ -182,6 +184,7 @@ def main(args, save_period=4000):
 
     train_history = [[], []]  # [0] is history of losses, [1] is errors
     valid_history = [[], []]
+    start_time = datetime.datetime.now()
     for epoch in range(args.start_epoch, args.num_epoch):
         last_save_pt = 0
         st = 0
@@ -221,7 +224,9 @@ def main(args, save_period=4000):
             break
         logging.info("epoch {} done, Time{}".format(epoch, datetime.datetime.now()))
         args.st = 0
-
+    end_time = datetime.datetime.now()
+    csv_save_dict["train_time"] = (end_time - start_time).microseconds
+    csv_save_dict["best_error"] = best_err
     if args.resume:
         checkpoint_dir = args.resume
         best_net_file = os.path.join(checkpoint_dir, 'net_best.pth')
@@ -239,6 +244,19 @@ def main(args, save_period=4000):
     test_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=0)
     test_error = eval_data_in_batch_new(model, test_loader, criterion, logger_name="log_test")[1]
     logger.info("FINAL test error = {}".format(test_error))
+
+    if args.csv_file:
+        if os.path.isfile(args.csv_file):
+            with open(args.csv_file, 'r+') as f:
+                header = next(csv.reader(f))
+                dict_writer = csv.DictWriter(f, header, -999)
+                dict_writer.writerow(csv_save_dict)
+        else:
+            with open(args.csv_file, 'w') as f:
+                writer = csv.DictWriter(f, csv_save_dict.keys())
+                writer.writeheader()
+                writer.writerow(csv_save_dict)
+
     return train_history, valid_history
 
 
