@@ -17,6 +17,7 @@ import functools
 import _settings
 import ipdb
 import csv
+import glob
 
 print("Cuda available?", torch.cuda.is_available())
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -236,17 +237,17 @@ def main(args, save_period=4000):
     csv_save_dict["train_time"] = (end_time - start_time).microseconds
     csv_save_dict["best_error"] = best_err
 
-    if args.resume:
-        logger.info("Resume Testing run {}".format(args.ckpt_dir))
-        best_net_file = os.path.join(args.ckpt_dir, 'net_best.pth')
-        if os.path.isfile(best_net_file):
-            logger.info("=> loading best model '{}'".format(best_net_file))
-            checkpoint = torch.load(best_net_file)
-            best_err = checkpoint['best_err']
-            model.load_state_dict(checkpoint['state_dict'])
-            logger.info("=> loaded best model with valid_err={}".format(best_err))
-        else:
-            logger.info("=> no best model found at '{}'".format(best_net_file))
+    # Testing phase --> Load best trained model
+    logger.info("Resume Testing on best run in {}".format(args.ckpt_dir))
+    best_net_file = os.path.join(args.ckpt_dir, 'net_best.pth')
+    if os.path.isfile(best_net_file):
+        logger.info("=> loading best model '{}'".format(best_net_file))
+        checkpoint = torch.load(best_net_file)
+        best_err = checkpoint['best_err']
+        model.load_state_dict(checkpoint['state_dict'])
+        logger.info("=> loaded best model with valid_err={}".format(best_err))
+    else:
+        logger.info("=> no best model found at '{}'".format(best_net_file))
 
     model.eval()
     # test_error = eval_data_in_batch(model, data_test, label_test,criterion,logger_name="log_test",batch_size=args.batch_size)[1]
@@ -267,7 +268,6 @@ def main(args, save_period=4000):
                 writer.writerow(csv_save_dict)
 
     return train_history, valid_history
-
 
 # newest
 if __name__ == "__main__":
@@ -310,7 +310,15 @@ if __name__ == "__main__":
     log_dir = os.path.dirname(args.logPath)
     if not os.path.isdir(log_dir):
         os.makedirs(log_dir)
+
     if not os.path.isdir(args.ckpt_dir):
         os.makedirs(args.ckpt_dir)
+    else:
+        # preserve the best net by adding a suffix to it
+        element = len(glob.glob(os.path.join(args.ckpt_dir, "net_best*.pth")))
+        try:
+            os.rename(os.path.join(args.ckpt_dir, "net_best.pth"), os.path.join(args.ckpt_dir, "net_best_{}.pth".format(element)))
+        except FileNotFoundError:
+            print("Did not find previous run file, continue with training")
 
     main(args, save_period=20000)
