@@ -6,7 +6,7 @@ num_iterations=5
 path=$(pwd)
 main_script=$path/MNIST/main.py
 
-csv_file=$path/MNIST/benchmark.csv
+csv_file=$1/benchmark.csv
 log_dir=$1
 for ((iteration=0; iteration<$num_iterations; iteration++)); do
     for mst_weight in "${mst_weight_type[@]}"; do
