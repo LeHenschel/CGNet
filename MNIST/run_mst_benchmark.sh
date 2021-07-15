@@ -1,7 +1,7 @@
 #!/bin/bash
 
 declare -a mst_weight_type=("" "--mst --mst_weight cost" "--mst --mst_weight random" "--mst --mst_weight sum" "--mst --mst_weight none")
-num_iterations=1
+num_iterations=5
 
 path=$(pwd)
 main_script=$path/MNIST/main.py
