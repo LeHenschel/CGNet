@@ -20,7 +20,6 @@ import csv
 import glob
 
 print("Cuda available?", torch.cuda.is_available())
-CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 
 TRAIN = 'train'
 VALID = 'val'
@@ -49,6 +48,8 @@ def argument_parse():
                              '1: batch-normalization in each layer by scaling each fragment down by a moving average of standard deviation\n')
     parser.add_argument('--ckpt_dir', type=str, default=None,
                         help="Directory to store checkpoints. Will be automatically determined if not set based on selected options")
+    parser.add_argument('--base_dir', type=str, default=None,
+                        help="Base Directory to store checkpoints in. Will be automatically determined if not set based on selected options")
     parser.add_argument('--resume', action="store_true", default=False,
                         help='Flag, if training should be resumed for the given checkpoint.')
 
@@ -303,10 +304,16 @@ if __name__ == "__main__":
         train_name += "NR-NR"
     train_name += "" if args.dropout is None else "_dropout{}".format(args.dropout)
 
+    if args.base_dir is None:
+        CUR_DIR = os.path.dirname(os.path.realpath(__file__))
+    else:
+        CUR_DIR = args.base_dir
+
     if args.logPath is None:
         args.logPath = CUR_DIR + "/temp_fast/logs/{}.log".format(train_name)
     if args.ckpt_dir is None:
         args.ckpt_dir = CUR_DIR + "/temp_fast/checkpoint/{}/".format(train_name)
+
     log_dir = os.path.dirname(args.logPath)
     if not os.path.isdir(log_dir):
         os.makedirs(log_dir)
