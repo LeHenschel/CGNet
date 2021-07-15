@@ -10,7 +10,7 @@ csv_file=$path/MNIST/benchmark.csv
 
 for ((iteration=0; iteration<$num_iterations; iteration++)); do
     for mst_weight in "${mst_weight_type[@]}"; do
-         bash ./MNIST/launch_mnist_run.sh "$main_script" "$mst_weight" "--csv_file $csv_file"  # For HPC change bash to sbatch
+         bash ./launch_mnist_run.sh "$main_script" "$mst_weight" "--csv_file $csv_file"  # For HPC change bash to sbatch
     done
 done
 
