@@ -84,6 +84,8 @@ def argument_parse():
                              "         random = random weights (randomly sampled in interval [1, 10],"
                              "         none = unweighted (same weight of 1 for all edges)")
     parser.add_argument('--mst', action="store_true", default=False, help="Reduce CG fragments via MST. Default: False")
+    parser.add_argument('--py', action="store_true", default=False,
+                        help="Use the python version of SphericalCNN (not CUDA optimized)")
     sel_option = parser.parse_args()
     return sel_option
 
@@ -167,7 +169,7 @@ def main(args, save_period=4000):
     model = MNIST_model.MNIST_Net(args.lmax - 1, args.tau_type, args.tau_man,
                                   args.nlayers, skipconn=True, norm=True, cuda=True,
                                   dropout=args.dropout, nfc=args.nfc, sparse=args.mst,
-                                  weight_type=args.mst_weight)
+                                  weight_type=args.mst_weight, py=args.py)
     MNIST_model.show_num_parameters(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)  # added weigth decay
