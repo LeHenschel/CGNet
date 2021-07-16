@@ -31,15 +31,19 @@ class MNIST_Net(nn.Module):
                  nlayers=5,
                  skipconn=True, norm=True, cuda=True,
                  dropout=0.5, nfc=1, sparse=False,
-                 weight_type="cost"):
+                 weight_type="cost", py=False):
         super(MNIST_Net, self).__init__()
 
         taus = define_taus(tau_type, tau_man, lmax)
 
         taus = [[1 for _ in range(lmax + 1)]] + [taus for _ in range(nlayers)]
         assert cuda and norm and skipconn,  "Do not support these parameters yet"
-        self.SphericalCNN = cgnet.SphericalCNN(lmax, taus, cuda=cuda, norm=norm, skipconn=skipconn, sparse_flag=sparse,
-                                               weight_type=weight_type)
+        if py:
+            self.SphericalCNN = cgnet.SphericalCNN_py(lmax, taus, cuda=cuda, norm=norm, skipconn=skipconn,
+                                                      sparse_flag=sparse, weight_type=weight_type)
+        else:
+            self.SphericalCNN = cgnet.SphericalCNN(lmax, taus, cuda=cuda, norm=norm, skipconn=skipconn,
+                                                   sparse_flag=sparse, weight_type=weight_type)
 
         if norm:
             self.bm1 = nn.BatchNorm1d(self.SphericalCNN.output_length)
