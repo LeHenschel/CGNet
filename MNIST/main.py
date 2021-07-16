@@ -237,7 +237,7 @@ def main(args, save_period=4000):
         logging.info("epoch {} done, Time{}".format(epoch, datetime.datetime.now()))
         args.st = 0
     end_time = datetime.datetime.now()
-    csv_save_dict["train_time"] = (end_time - start_time).microseconds
+    csv_save_dict["train_time"] = (end_time - start_time).seconds
     csv_save_dict["best_error"] = best_err
 
     # Testing phase --> Load best trained model
