@@ -13,6 +13,7 @@ for ((iteration=0; iteration<$num_iterations; iteration++)); do
          echo bash ./launch_mnist_run.sh "$main_script" "$mst_weight" "--csv_file $csv_file"  # For HPC change bash to sbatch
     done
 done
+sbatch ./launch_mnist_run.sh "$main_script" "--mst --mst_weight cost" "--csv_file $csv_file"  # For HPC change bash to sbatch
 
 
 # for ((iteration=0; iteration<$num_iterations; iteration++)); do

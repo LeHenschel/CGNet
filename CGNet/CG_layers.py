@@ -1,3 +1,10 @@
+import os
+import sys
+CUR_DIR = os.path.dirname(os.path.realpath(__file__))
+if CUR_DIR not in sys.path:
+    sys.path.append(CUR_DIR)
+print(sys.path)
+
 from importlib import reload
 from torch import nn
 import torch

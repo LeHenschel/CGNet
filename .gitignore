@@ -11,3 +11,5 @@
 **/_ext
 **/.idea/*
 
+# Ignore singularity file
+*.sif

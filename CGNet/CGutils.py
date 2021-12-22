@@ -2,8 +2,8 @@ import os
 import sys
 from importlib import reload
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
-if os.path.abspath(os.path.join(CUR_DIR, '..', '..')) not in sys.path:
-    sys.path.append(os.path.abspath(os.path.join(CUR_DIR, '..', '..')))
+if CUR_DIR not in sys.path:
+    sys.path.append(CUR_DIR)
 import torch.nn as nn
 import ClebschGordan
 import torch

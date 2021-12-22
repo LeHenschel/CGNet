@@ -1,3 +1,6 @@
+import sys
+sys.path.append("../")
+
 import numpy as np
 import logging
 import torch
@@ -11,7 +14,6 @@ import datetime
 import MNIST.model as MNIST_model
 import MNIST.dataloader as MNIST_dld
 from torch.utils.data import DataLoader
-import sys
 import tqdm
 import functools
 import _settings
