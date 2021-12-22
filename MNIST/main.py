@@ -19,9 +19,9 @@ import functools
 import _settings
 import ipdb
 import csv
+import glob
 
 print("Cuda available?", torch.cuda.is_available())
-CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 
 TRAIN = 'train'
 VALID = 'val'
@@ -50,6 +50,8 @@ def argument_parse():
                              '1: batch-normalization in each layer by scaling each fragment down by a moving average of standard deviation\n')
     parser.add_argument('--ckpt_dir', type=str, default=None,
                         help="Directory to store checkpoints. Will be automatically determined if not set based on selected options")
+    parser.add_argument('--base_dir', type=str, default=None,
+                        help="Base Directory to store checkpoints in. Will be automatically determined if not set based on selected options")
     parser.add_argument('--resume', action="store_true", default=False,
                         help='Flag, if training should be resumed for the given checkpoint.')
 
@@ -84,6 +86,8 @@ def argument_parse():
                              "         random = random weights (randomly sampled in interval [1, 10],"
                              "         none = unweighted (same weight of 1 for all edges)")
     parser.add_argument('--mst', action="store_true", default=False, help="Reduce CG fragments via MST. Default: False")
+    parser.add_argument('--py', action="store_true", default=False,
+                        help="Use the python version of SphericalCNN (not CUDA optimized)")
     sel_option = parser.parse_args()
     return sel_option
 
@@ -167,7 +171,7 @@ def main(args, save_period=4000):
     model = MNIST_model.MNIST_Net(args.lmax - 1, args.tau_type, args.tau_man,
                                   args.nlayers, skipconn=True, norm=True, cuda=True,
                                   dropout=args.dropout, nfc=args.nfc, sparse=args.mst,
-                                  weight_type=args.mst_weight)
+                                  weight_type=args.mst_weight, py=args.py)
     MNIST_model.show_num_parameters(model)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)  # added weigth decay
@@ -235,20 +239,20 @@ def main(args, save_period=4000):
         logging.info("epoch {} done, Time{}".format(epoch, datetime.datetime.now()))
         args.st = 0
     end_time = datetime.datetime.now()
-    csv_save_dict["train_time"] = (end_time - start_time).microseconds
+    csv_save_dict["train_time"] = (end_time - start_time).seconds
     csv_save_dict["best_error"] = best_err
 
-    if args.resume:
-        logger.info("Resume Testing run {}".format(args.ckpt_dir))
-        best_net_file = os.path.join(args.ckpt_dir, 'net_best.pth')
-        if os.path.isfile(best_net_file):
-            logger.info("=> loading best model '{}'".format(best_net_file))
-            checkpoint = torch.load(best_net_file)
-            best_err = checkpoint['best_err']
-            model.load_state_dict(checkpoint['state_dict'])
-            logger.info("=> loaded best model with valid_err={}".format(best_err))
-        else:
-            logger.info("=> no best model found at '{}'".format(best_net_file))
+    # Testing phase --> Load best trained model
+    logger.info("Resume Testing on best run in {}".format(args.ckpt_dir))
+    best_net_file = os.path.join(args.ckpt_dir, 'net_best.pth')
+    if os.path.isfile(best_net_file):
+        logger.info("=> loading best model '{}'".format(best_net_file))
+        checkpoint = torch.load(best_net_file)
+        best_err = checkpoint['best_err']
+        model.load_state_dict(checkpoint['state_dict'])
+        logger.info("=> loaded best model with valid_err={}".format(best_err))
+    else:
+        logger.info("=> no best model found at '{}'".format(best_net_file))
 
     model.eval()
     # test_error = eval_data_in_batch(model, data_test, label_test,criterion,logger_name="log_test",batch_size=args.batch_size)[1]
@@ -269,7 +273,6 @@ def main(args, save_period=4000):
                 writer.writerow(csv_save_dict)
 
     return train_history, valid_history
-
 
 # newest
 if __name__ == "__main__":
@@ -305,14 +308,28 @@ if __name__ == "__main__":
         train_name += "NR-NR"
     train_name += "" if args.dropout is None else "_dropout{}".format(args.dropout)
 
+    if args.base_dir is None:
+        CUR_DIR = os.path.dirname(os.path.realpath(__file__))
+    else:
+        CUR_DIR = args.base_dir
+
     if args.logPath is None:
         args.logPath = CUR_DIR + "/temp_fast/logs/{}.log".format(train_name)
     if args.ckpt_dir is None:
         args.ckpt_dir = CUR_DIR + "/temp_fast/checkpoint/{}/".format(train_name)
+
     log_dir = os.path.dirname(args.logPath)
     if not os.path.isdir(log_dir):
         os.makedirs(log_dir)
+
     if not os.path.isdir(args.ckpt_dir):
         os.makedirs(args.ckpt_dir)
+    else:
+        # preserve the best net by adding a suffix to it
+        element = len(glob.glob(os.path.join(args.ckpt_dir, "net_best*.pth")))
+        try:
+            os.rename(os.path.join(args.ckpt_dir, "net_best.pth"), os.path.join(args.ckpt_dir, "net_best_{}.pth".format(element)))
+        except FileNotFoundError:
+            print("Did not find previous run file, continue with training")
 
     main(args, save_period=20000)
